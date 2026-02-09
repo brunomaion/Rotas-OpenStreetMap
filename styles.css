@@ -102,6 +102,14 @@ button {
     background: #e0e0e0;
 }
 
+.btn-compact {
+  padding: 8px 12px;
+  font-size: 15px;
+  max-height: 36px;
+  width: 100%;
+  font-weight: bold;
+}
+
 .presets {
     display: flex;
     flex-direction: column;

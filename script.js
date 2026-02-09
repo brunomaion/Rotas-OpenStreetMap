@@ -3,6 +3,11 @@ let routingControl;
 let marcadores = [];
 let paradaCount = 0;
 
+function limparParadas() {
+    document.getElementById('paradasContainer').innerHTML = '';
+    paradaCount = 0;
+}
+
 function selecionarCampo(campo) {
     document.querySelector(`input[name="campoAtivo"][value="${campo}"]`).checked = true;
 }
@@ -231,8 +236,55 @@ function limparMapa() {
     document.getElementById('origem-nome').value = '';
     document.getElementById('destino').value = '';
     document.getElementById('destino-nome').value = '';
-    document.getElementById('paradasContainer').innerHTML = '';
-    paradaCount = 0;
+    limparParadas();
+}
+
+function parseCsv(text) {
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+
+    const rows = lines.map(line => line.split(',').map(value => value.trim()));
+
+    const header = rows[0].map(cell => cell.toLowerCase());
+    const hasHeader = header.includes('nome') && header.includes('latitude') && header.includes('longitude');
+
+    const dataRows = hasHeader ? rows.slice(1) : rows;
+    return dataRows
+        .filter(row => row.length >= 3)
+        .map(row => ({
+            nome: row[0],
+            latitude: row[1],
+            longitude: row[2]
+        }));
+}
+
+function carregarCsv(textoCsv) {
+    const registros = parseCsv(textoCsv);
+    if (registros.length < 2) {
+        alert('O CSV precisa ter ao menos 2 linhas de dados (origem e destino).');
+        return;
+    }
+
+    const origem = registros[0];
+    const destino = registros[registros.length - 1];
+    const paradas = registros.slice(1, -1);
+
+    document.getElementById('origem-nome').value = origem.nome;
+    document.getElementById('origem').value = `${origem.latitude}, ${origem.longitude}`;
+
+    document.getElementById('destino-nome').value = destino.nome;
+    document.getElementById('destino').value = `${destino.latitude}, ${destino.longitude}`;
+
+    limparParadas();
+
+    paradas.forEach(parada => {
+        adicionarParada();
+        const id = `parada-input-${paradaCount}`;
+        const nomeInput = document.getElementById(`${id}-nome`);
+        const coordInput = document.getElementById(id);
+        if (nomeInput) nomeInput.value = parada.nome;
+        if (coordInput) coordInput.value = `${parada.latitude}, ${parada.longitude}`;
+    });
 }
 
 function adicionarParada() {
@@ -264,3 +316,19 @@ function removerParada(id) {
 
 // Inicializar mapa quando a página carregar
 window.addEventListener('DOMContentLoaded', initMap);
+window.addEventListener('DOMContentLoaded', () => {
+    const csvInput = document.getElementById('csvInput');
+    if (!csvInput) return;
+
+    csvInput.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            carregarCsv(String(reader.result || ''));
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    });
+});

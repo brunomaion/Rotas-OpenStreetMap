@@ -28,6 +28,16 @@
                 </button>
             </div>
 
+            <div style="margin: 10px 0;">
+                <div style="font-size: 12px; color: #666; margin-bottom: 6px;">
+                    Formato: nome,latitude,longitude
+                </div>
+                <button class="btn-secondary btn-compact" onclick="document.getElementById('csvInput').click()">
+                    Carregar CSV
+                </button>
+                <input type="file" id="csvInput" accept=".csv" style="display: none;">
+            </div>
+
             <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 10px 0;">
 
             <h2>Inserir Coordenadas</h2>
@@ -54,8 +64,8 @@
                 <input type="text" id="destino" placeholder="Latitude, Longitude: Ex: -24.9875937, -53.453374" onfocus="selecionarCampo('destino')">
             </div>
 
-            <button class="btn-secondary" onclick="adicionarParada()" style="margin: 10px 0; padding: 8px 12px; font-size: 12px; max-height: 36px;">
-                ➕ Adicionar Parada
+            <button class="btn-secondary btn-compact" onclick="adicionarParada()" style="margin: 10px 0;">
+                Adicionar Parada
             </button>
 
             <div class="button-group">
