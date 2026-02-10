@@ -591,7 +591,7 @@ function mostrarRotaParcial(index) {
         map.removeLayer(linhaParcialAtiva);
     }
     
-    // Esmaecer todas as linhas (rota completa)
+
     map.eachLayer(function(layer) {
         if (layer instanceof L.Polyline) {
             if (layer.setStyle) {
@@ -600,7 +600,7 @@ function mostrarRotaParcial(index) {
         }
     });
     
-    // Desenhar apenas o segmento selecionado
+
     const latlngs = segmento.coordenadas.map(c => [c.lat, c.lng]);
     linhaParcialAtiva = L.polyline(latlngs, {
         color: '#002fff',
