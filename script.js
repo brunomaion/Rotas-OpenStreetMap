@@ -161,17 +161,24 @@ function calcularRota() {
             document.getElementById('loading').classList.remove('active');
             
             const route = e.routes[0];
-            const distance = (route.summary.totalDistance / 1000).toFixed(2);
-            const time = Math.round(route.summary.totalTime / 60);
-
 
             calcularSegmentosParciais(route, waypoints);
-
-
-            document.getElementById('distance').textContent = distance + ' km';
-            document.getElementById('time').textContent = time + ' minutos';
             
+            // Calcular soma de todos os segmentos
+            let distanciaTotal = 0;
+            let tempoTotal = 0;
+            
+            segmentosParciais.forEach(segmento => {
+                distanciaTotal += segmento.distancia;
+                tempoTotal += segmento.tempo;
+            });
+            
+            const distanciaKm = (distanciaTotal / 1000).toFixed(2);
+            const tempoMin = Math.round(tempoTotal);
 
+            document.getElementById('distance').textContent = distanciaKm + ' km';
+            document.getElementById('time').textContent = tempoMin + ' minutos';
+            
             document.getElementById('originInfo').textContent = origemLabel;
             document.getElementById('destinyInfo').textContent = destinoLabel;
             
@@ -236,9 +243,11 @@ function limparMapa() {
     segmentosParciais = [];
     waypointsInfo = [];
     segmentoSelecionado = null;
+    segmentosPercorridos = {};
     
     document.getElementById('routeDetails').style.display = 'none';
     document.getElementById('routePartialsInfo').style.display = 'none';
+    document.getElementById('routeProgressInfo').style.display = 'none';
     document.getElementById('noRoute').style.display = 'block';
     document.getElementById('routeInfo').classList.remove('active');
     
@@ -496,6 +505,38 @@ function toggleSegmentoPercorrido(index) {
     } else {
         segmentosPercorridos[index] = false;
         segmento.style.opacity = '1';
+    }
+    
+    // Atualizar progresso
+    atualizarProgressoNavegacao();
+}
+
+function atualizarProgressoNavegacao() {
+    const totalSegmentos = segmentosParciais.length;
+    const segmentosMarked = Object.values(segmentosPercorridos).filter(v => v === true).length;
+    
+    // Calcular distância e tempo percorridos
+    let distanciaTotal = 0;
+    let tempoTotal = 0;
+    
+    Object.keys(segmentosPercorridos).forEach(idx => {
+        if (segmentosPercorridos[idx]) {
+            distanciaTotal += segmentosParciais[idx].distancia;
+            tempoTotal += segmentosParciais[idx].tempo;
+        }
+    });
+    
+    const distanciaKm = (distanciaTotal / 1000).toFixed(2);
+    const tempoMin = Math.round(tempoTotal);
+    
+    // Atualizar elementos na tela
+    document.getElementById('segmentosPercorridosCount').textContent = `${segmentosMarked}/${totalSegmentos}`;
+    document.getElementById('distanciaPercorrida').textContent = `${distanciaKm} km`;
+    document.getElementById('tempoPercorrido').textContent = `${tempoMin} min`;
+    
+    // Mostrar container de progresso
+    if (segmentosMarked > 0) {
+        document.getElementById('routeProgressInfo').style.display = 'block';
     }
 }
 
