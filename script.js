@@ -2,6 +2,11 @@ let map;
 let routingControl;
 let marcadores = [];
 let paradaCount = 0;
+let segmentosParciais = [];
+let waypointsInfo = [];
+let linhaParcialAtiva = null;
+let segmentoSelecionado = null;
+let segmentosPercorridos = {};
 
 function limparParadas() {
     document.getElementById('paradasContainer').innerHTML = '';
@@ -159,30 +164,24 @@ function calcularRota() {
             const distance = (route.summary.totalDistance / 1000).toFixed(2);
             const time = Math.round(route.summary.totalTime / 60);
 
-            // Atualizar detalhes da rota
+
+            calcularSegmentosParciais(route, waypoints);
+
+
             document.getElementById('distance').textContent = distance + ' km';
             document.getElementById('time').textContent = time + ' minutos';
             
-            // Mostrar nome ou coordenadas
+
             document.getElementById('originInfo').textContent = origemLabel;
             document.getElementById('destinyInfo').textContent = destinoLabel;
             
-            // Extrair e mostrar instruções
-            const instructionsList = document.getElementById('instructionsList');
-            instructionsList.innerHTML = '';
-            
-            route.instructions.forEach(function(instruction, index) {
-                const li = document.createElement('li');
-                li.textContent = instruction.text;
-                instructionsList.appendChild(li);
-            });
+            exibirSegmentosParciais();
             
             document.getElementById('routeDetails').style.display = 'block';
-            document.getElementById('routeInstructions').style.display = 'block';
+            document.getElementById('routePartialsInfo').style.display = 'block';
             document.getElementById('noRoute').style.display = 'none';
             document.getElementById('routeInfo').classList.add('active');
 
-            // Ajustar o mapa para mostrar toda a rota
             setTimeout(() => {
                 const bounds = routingControl.getBounds();
                 if (bounds && bounds.isValid()) {
@@ -227,8 +226,19 @@ function limparMapa() {
         routingControl = null;
     }
     
+    // Limpar linha parcial
+    if (linhaParcialAtiva) {
+        map.removeLayer(linhaParcialAtiva);
+        linhaParcialAtiva = null;
+    }
+    
+    // Limpar segmentos parciais
+    segmentosParciais = [];
+    waypointsInfo = [];
+    segmentoSelecionado = null;
+    
     document.getElementById('routeDetails').style.display = 'none';
-    document.getElementById('routeInstructions').style.display = 'none';
+    document.getElementById('routePartialsInfo').style.display = 'none';
     document.getElementById('noRoute').style.display = 'block';
     document.getElementById('routeInfo').classList.remove('active');
     
@@ -312,6 +322,271 @@ function removerParada(id) {
     if (paradaDiv) {
         paradaDiv.remove();
     }
+}
+
+function calcularSegmentosParciais(route, waypoints) {
+    segmentosParciais = [];
+    waypointsInfo = [];
+    
+    const coordsCompletas = route.coordinates;
+    const instructions = route.instructions;
+    
+    // Armazenar informações dos waypoints
+    const origemNome = document.getElementById('origem-nome').value.trim() || 'Origem';
+    const destinoNome = document.getElementById('destino-nome').value.trim() || 'Destino';
+    
+    waypointsInfo.push({ nome: origemNome, coords: waypoints[0] });
+    
+    // Adicionar paradas intermediárias
+    const paradasInputs = document.querySelectorAll('.parada-input');
+    paradasInputs.forEach((input, index) => {
+        const coords = parseCoordinates(input.value.trim());
+        if (coords) {
+            const paradaId = input.id;
+            const nomeInput = document.getElementById(paradaId + '-nome');
+            const paradaNome = nomeInput ? nomeInput.value.trim() : '';
+            waypointsInfo.push({ 
+                nome: paradaNome || `Parada ${index + 1}`, 
+                coords: L.latLng(coords[0], coords[1]) 
+            });
+        }
+    });
+    
+    waypointsInfo.push({ nome: destinoNome, coords: waypoints[waypoints.length - 1] });
+    
+    // Calcular cada segmento
+    for (let i = 0; i < waypoints.length - 1; i++) {
+        const inicio = waypoints[i];
+        const fim = waypoints[i + 1];
+        
+        // Encontrar índices mais próximos nas coordenadas da rota
+        let indiceInicio = 0;
+        let indiceFim = coordsCompletas.length - 1;
+        let menorDistInicio = Infinity;
+        let menorDistFim = Infinity;
+        
+        coordsCompletas.forEach((coord, idx) => {
+            const distInicio = Math.sqrt(
+                Math.pow(coord.lat - inicio.lat, 2) + 
+                Math.pow(coord.lng - inicio.lng, 2)
+            );
+            const distFim = Math.sqrt(
+                Math.pow(coord.lat - fim.lat, 2) + 
+                Math.pow(coord.lng - fim.lng, 2)
+            );
+            
+            if (distInicio < menorDistInicio) {
+                menorDistInicio = distInicio;
+                indiceInicio = idx;
+            }
+            if (distFim < menorDistFim && idx > indiceInicio) {
+                menorDistFim = distFim;
+                indiceFim = idx;
+            }
+        });
+        
+        const coordsSegmento = coordsCompletas.slice(indiceInicio, indiceFim + 1);
+        
+        // Calcular distância do segmento
+        let distanciaSegmento = 0;
+        for (let j = 0; j < coordsSegmento.length - 1; j++) {
+            distanciaSegmento += map.distance(
+                [coordsSegmento[j].lat, coordsSegmento[j].lng],
+                [coordsSegmento[j + 1].lat, coordsSegmento[j + 1].lng]
+            );
+        }
+        
+        // Estimar tempo (assumindo velocidade média de 50 km/h)
+        const tempoSegmento = (distanciaSegmento / 1000) / 50 * 60;
+        
+        // Filtrar instruções relevantes para este segmento
+        const instrucoesSegmento = instructions.filter(inst => {
+            const idx = inst.index || 0;
+            return idx >= indiceInicio && idx <= indiceFim;
+        });
+        
+        segmentosParciais.push({
+            origem: waypointsInfo[i].nome,
+            destino: waypointsInfo[i + 1].nome,
+            distancia: distanciaSegmento,
+            tempo: tempoSegmento,
+            instrucoes: instrucoesSegmento,
+            coordenadas: coordsSegmento
+        });
+    }
+}
+
+function exibirSegmentosParciais() {
+    const container = document.getElementById('partialsContainer');
+    container.innerHTML = '';
+    
+    if (segmentosParciais.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.7);">Nenhum segmento calculado</p>';
+        return;
+    }
+    
+    segmentosParciais.forEach((segmento, index) => {
+        const segmentoDiv = document.createElement('div');
+        segmentoDiv.className = 'partial-segment';
+        segmentoDiv.style.cursor = 'pointer';
+        
+        const distanciaKm = (segmento.distancia / 1000).toFixed(2);
+        const tempoMin = Math.round(segmento.tempo);
+        
+        segmentoDiv.innerHTML = `
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+                <input type="checkbox" id="segment-check-${index}" class="segment-checkbox" style="margin-top: 12px; cursor: pointer;" onchange="toggleSegmentoPercorrido(${index})">
+                <div style="flex: 1;">
+                    <div class="segment-header">
+                        <strong style="font-size: 14px;">${segmento.origem}</strong>
+                        <span style="font-size: 20px; margin: 5px 0;">↓</span>
+                        <strong style="font-size: 14px;">${segmento.destino}</strong>
+                    </div>
+                    <div class="segment-info">
+                        <div class="info-item">
+                            <span class="info-label">Distância:</span>
+                            <span class="info-value">${distanciaKm} km</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Tempo:</span>
+                            <span class="info-value">${tempoMin} min</span>
+                        </div>
+                    </div>
+                    <button class="btn-segment-details" onclick="event.stopPropagation(); toggleInstrucoesSegmento(${index})">
+                        Ver Instruções ▼
+                    </button>
+                    <div class="segment-instructions" id="segment-instructions-${index}" style="display: none;">
+                        <ol>
+                            ${segmento.instrucoes.map(inst => `<li>${inst.text}</li>`).join('') || '<li>Siga em frente até o destino</li>'}
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar evento de clique no segmento
+        segmentoDiv.addEventListener('click', function() {
+            mostrarRotaParcial(index);
+        });
+        
+        container.appendChild(segmentoDiv);
+    });
+}
+
+function toggleInstrucoesSegmento(index) {
+    const instrucoesDiv = document.getElementById(`segment-instructions-${index}`);
+    const btn = instrucoesDiv.previousElementSibling;
+    
+    if (instrucoesDiv.style.display === 'none') {
+        instrucoesDiv.style.display = 'block';
+        btn.textContent = 'Ocultar Instruções ▲';
+    } else {
+        instrucoesDiv.style.display = 'none';
+        btn.textContent = 'Ver Instruções ▼';
+    }
+}
+
+function toggleSegmentoPercorrido(index) {
+    const checkbox = document.getElementById(`segment-check-${index}`);
+    const segmento = document.querySelector(`.partial-segment:nth-child(${index + 1})`);
+    
+    if (checkbox.checked) {
+        segmentosPercorridos[index] = true;
+        segmento.style.opacity = '0.6';
+    } else {
+        segmentosPercorridos[index] = false;
+        segmento.style.opacity = '1';
+    }
+}
+
+function mostrarRotaParcial(index) {
+    if (index < 0 || index >= segmentosParciais.length) return;
+    
+    const segmento = segmentosParciais[index];
+    
+    // Se clicar no mesmo segmento, volta a mostrar rota completa
+    if (segmentoSelecionado === index) {
+        segmentoSelecionado = null;
+        
+        // Remover linha parcial
+        if (linhaParcialAtiva) {
+            map.removeLayer(linhaParcialAtiva);
+            linhaParcialAtiva = null;
+        }
+        
+        // Restaurar rota completa - encontrar todas as linhas e restaurá-las
+        map.eachLayer(function(layer) {
+            if (layer instanceof L.Polyline && layer !== linhaParcialAtiva) {
+                if (layer.setStyle) {
+                    layer.setStyle({ opacity: 0.8, weight: 5 });
+                }
+            }
+        });
+        
+        // Remover destaque dos segmentos
+        document.querySelectorAll('.partial-segment').forEach(seg => {
+            seg.style.border = '2px solid #000000';
+            seg.style.transform = '';
+        });
+        
+        // Ajustar visualização para rota completa
+        if (routingControl) {
+            const bounds = routingControl.getBounds();
+            if (bounds && bounds.isValid()) {
+                map.fitBounds(bounds, {
+                    padding: [80, 80],
+                    maxZoom: 15
+                });
+            }
+        }
+        
+        return;
+    }
+    
+    segmentoSelecionado = index;
+    
+    // Remover linha parcial anterior se existir
+    if (linhaParcialAtiva) {
+        map.removeLayer(linhaParcialAtiva);
+    }
+    
+    // Esmaecer todas as linhas (rota completa)
+    map.eachLayer(function(layer) {
+        if (layer instanceof L.Polyline) {
+            if (layer.setStyle) {
+                layer.setStyle({ opacity: 0.5, weight: 4 });
+            }
+        }
+    });
+    
+    // Desenhar apenas o segmento selecionado
+    const latlngs = segmento.coordenadas.map(c => [c.lat, c.lng]);
+    linhaParcialAtiva = L.polyline(latlngs, {
+        color: '#002fff',
+        weight: 6,
+        opacity: 1,
+        zIndex: 1000
+    }).addTo(map);
+    
+    // Ajustar o mapa para o segmento
+    const bounds = linhaParcialAtiva.getBounds();
+    if (bounds && bounds.isValid()) {
+        map.fitBounds(bounds, {
+            padding: [100, 100],
+            maxZoom: 16
+        });
+    }
+    
+    // Destacar visualmente o segmento selecionado
+    document.querySelectorAll('.partial-segment').forEach((seg, idx) => {
+        if (idx === index) {
+            seg.style.border = '3px solid #002fff';
+            seg.style.transform = 'scale(1.02)';
+        } else {
+            seg.style.border = '2px solid #000000';
+            seg.style.transform = '';
+        }
+    });
 }
 
 // Inicializar mapa quando a página carregar
