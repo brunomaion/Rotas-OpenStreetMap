@@ -12,13 +12,44 @@ body {
     flex-direction: column;
 }
 
+.system-switcher {
+    display: flex;
+    gap: 10px;
+    padding: 12px 15px 0;
+    background: #ffffff;
+}
+
+.system-tab {
+    flex: 0 0 auto;
+    background: #f0f0f0;
+    color: #333;
+    border: 1px solid #d8d8d8;
+    padding: 10px 14px;
+}
+
+.system-tab.active {
+    background: #002fff;
+    color: #fff;
+    border-color: #0026cc;
+}
+
+.system-panel {
+    display: none;
+    width: 100%;
+    height: calc(100vh - 62px);
+}
+
+.system-panel.active {
+    display: block;
+}
+
 
 .container {
     display: flex;
     gap: 15px;
     padding: 15px;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     background: #f5f5f5;
     overflow: hidden;
 }
@@ -28,7 +59,7 @@ body {
     border-radius: 10px;
     padding: 20px;
     width: 320px;
-    height: calc(100vh - 30px);
+    height: calc(100% - 30px);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
@@ -161,7 +192,7 @@ button {
 
 .route-container {
     width: 480px;
-    height: calc(100vh - 30px);
+    height: calc(100% - 30px);
     overflow-y: auto;
     flex-shrink: 0;
 }
@@ -172,8 +203,15 @@ button {
     border-radius: 10px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     overflow: hidden;
-    height: calc(100vh - 30px);
+    height: calc(100% - 30px);
     z-index: 1;
+}
+
+#pontosFrame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #f4f5f7;
 }
 
 #map {

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerenciador de Pontos</title>
+
+  <link rel="stylesheet" href="pontos.css">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+  <h1>Gerenciador de Pontos</h1>
+  <div class="container-central">
+
+
+  <div id="listaPontos"></div>
+
+  <div class="acoes-principais">
+    <button onclick="adicionarPonto()">Adicionar Ponto</button>
+    <button onclick="abrirSeletorCSV()">Carregar CSV</button>
+    <button onclick="abrirSeletorJSON()">Carregar JSON</button>
+    <button class="secondary" onclick="voltarSitePrincipal()">Ir para Site Principal</button>
+  </div>
+
+
+
+  <div id="map"></div>
+
+  <div class="acoes-principais">
+    <p>Modo</p>
+    <select id="modoMatriz" aria-label="Modo da matriz">
+      <option value="euclidiana">Euclidiana</option>
+      <option value="osrm">API OpenStreetMap (OSRM)</option>
+    </select>
+    <button onclick="gerarMatriz()">Gerar Matriz de Custos</button>
+    <button onclick="salvarJSON()">Salvar JSON</button>
+  </div>
+
+  <input id="csvInput" type="file" accept=".csv,text/csv" style="display:none" />
+  <input id="jsonInput" type="file" accept=".json,application/json" style="display:none" />
+
+  <pre id="matrizOutput"></pre>
+
+  <div class="otimizador-box">
+    <h2>Otimizador</h2>
+    <div class="acoes-principais">
+      <p>Algoritmo</p>
+      <select id="otimizadorSelect" aria-label="Otimizador">
+        <option value="ag">AG</option>
+      </select>
+
+      <label class="parametro-item" for="agGeracoes">
+        <span>Gerações</span>
+        <input id="agGeracoes" type="number" min="1" step="1" value="500" placeholder="Gerações" />
+      </label>
+      <label class="parametro-item" for="agPopulacao">
+        <span>População</span>
+        <input id="agPopulacao" type="number" min="2" step="1" value="150" placeholder="População" />
+      </label>
+      <label class="parametro-item" for="agElitismo">
+        <span>Elitismo</span>
+        <input id="agElitismo" type="number" min="0" max="1" step="0.01" value="0.01" placeholder="Elitismo" />
+      </label>
+
+      <button onclick="executarOtimizador()">Executar Otimizador</button>
+      <div class="acoes-exportacao">
+        <button class="secondary" onclick="salvarMelhorRotaCSV()">Salvar CSV</button>
+        <button class="secondary" onclick="salvarMelhorRotaJSON()">Salvar JSON</button>
+      </div>
+    </div>
+
+    <pre id="otimizadorOutput"></pre>
+  </div>
+
+  </div>
+
+  <script src="ag.js"></script>
+  <script src="pontos.js"></script>
+</body>
+</html>

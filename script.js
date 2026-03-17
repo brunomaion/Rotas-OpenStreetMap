@@ -7,6 +7,7 @@ let waypointsInfo = [];
 let linhaParcialAtiva = null;
 let segmentoSelecionado = null;
 let segmentosPercorridos = {};
+const CHAVE_JSON_COMPARTILHADO = 'rotas2_json_ativo';
 
 function limparParadas() {
     document.getElementById('paradasContainer').innerHTML = '';
@@ -64,6 +65,8 @@ function calcularRota() {
             alert('Por favor, preencha as coordenadas de origem e destino no formato: -24.955296, -53.4747252');
             return;
         }
+
+        salvarJsonCompartilhadoRotas(obterPontosDoFormulario());
 
         document.getElementById('loading').classList.add('active');
         document.getElementById('routeInfo').classList.remove('active');
@@ -277,11 +280,29 @@ function parseCsv(text) {
         }));
 }
 
-function carregarCsv(textoCsv) {
-    const registros = parseCsv(textoCsv);
-    if (registros.length < 2) {
-        alert('O CSV precisa ter ao menos 2 linhas de dados (origem e destino).');
-        return;
+function normalizarRegistrosParaFormulario(listaPontos) {
+    if (!Array.isArray(listaPontos)) return [];
+
+    return listaPontos
+        .map((item, index) => {
+            const latitude = parseNumero(item?.latitude ?? item?.lat);
+            const longitude = parseNumero(item?.longitude ?? item?.lon ?? item?.lng);
+            if (latitude === null || longitude === null) {
+                return null;
+            }
+
+            return {
+                nome: String(item?.nome ?? item?.nome_local ?? item?.name ?? `Ponto ${index + 1}`),
+                latitude: String(latitude),
+                longitude: String(longitude)
+            };
+        })
+        .filter((item) => item !== null);
+}
+
+function preencherFormularioComRegistros(registros) {
+    if (!Array.isArray(registros) || registros.length < 2) {
+        return false;
     }
 
     const origem = registros[0];
@@ -304,6 +325,143 @@ function carregarCsv(textoCsv) {
         if (nomeInput) nomeInput.value = parada.nome;
         if (coordInput) coordInput.value = `${parada.latitude}, ${parada.longitude}`;
     });
+
+    return true;
+}
+
+function obterPontosDoFormulario() {
+    const registros = [];
+
+    const origemNome = document.getElementById('origem-nome').value.trim() || 'Origem';
+    const origem = parseCoordinates(document.getElementById('origem').value.trim());
+    if (!origem) {
+        return [];
+    }
+
+    registros.push({
+        nome: origemNome,
+        endereco: '',
+        latitude: String(origem[0]),
+        longitude: String(origem[1])
+    });
+
+    const paradasInputs = document.querySelectorAll('.parada-input');
+    paradasInputs.forEach((input, index) => {
+        const coords = parseCoordinates(input.value.trim());
+        if (!coords) return;
+
+        const nomeInput = document.getElementById(`${input.id}-nome`);
+        registros.push({
+            nome: nomeInput?.value?.trim() || `Parada ${index + 1}`,
+            endereco: '',
+            latitude: String(coords[0]),
+            longitude: String(coords[1])
+        });
+    });
+
+    const destinoNome = document.getElementById('destino-nome').value.trim() || 'Destino';
+    const destino = parseCoordinates(document.getElementById('destino').value.trim());
+    if (!destino) {
+        return [];
+    }
+
+    registros.push({
+        nome: destinoNome,
+        endereco: '',
+        latitude: String(destino[0]),
+        longitude: String(destino[1])
+    });
+
+    return registros;
+}
+
+function salvarJsonCompartilhadoRotas(registros) {
+    if (!Array.isArray(registros) || registros.length < 2) {
+        return;
+    }
+
+    const payload = {
+        versao: 1,
+        origem: 'rotas',
+        atualizadoEm: new Date().toISOString(),
+        dados: {
+            pontos: registros,
+            matriz_custos: []
+        }
+    };
+
+    localStorage.setItem(CHAVE_JSON_COMPARTILHADO, JSON.stringify(payload));
+}
+
+function carregarJsonCompartilhadoNoFormulario() {
+    const bruto = localStorage.getItem(CHAVE_JSON_COMPARTILHADO);
+    if (!bruto) {
+        return;
+    }
+
+    try {
+        const conteudo = JSON.parse(bruto);
+        const base = conteudo?.dados ?? conteudo;
+        const lista = Array.isArray(base?.pontos)
+            ? base.pontos
+            : (Array.isArray(base?.paradas) ? base.paradas : []);
+
+        const registros = normalizarRegistrosParaFormulario(lista);
+        preencherFormularioComRegistros(registros);
+    } catch {
+        // Ignora storage inválido.
+    }
+}
+
+function carregarCsv(textoCsv) {
+    const registros = parseCsv(textoCsv);
+    if (registros.length < 2) {
+        alert('O CSV precisa ter ao menos 2 linhas de dados (origem e destino).');
+        return;
+    }
+
+    preencherFormularioComRegistros(registros);
+    salvarJsonCompartilhadoRotas(normalizarRegistrosParaFormulario(registros));
+}
+
+function parseNumero(valor) {
+    const texto = String(valor ?? '').trim().replace(',', '.');
+    const numero = Number(texto);
+    return Number.isFinite(numero) ? numero : null;
+}
+
+function parseJson(textoJson) {
+    let conteudo;
+    try {
+        conteudo = JSON.parse(textoJson);
+    } catch (error) {
+        throw new Error('JSON inválido. Verifique o arquivo.');
+    }
+
+    const base = conteudo?.dados ?? conteudo;
+
+    const lista = Array.isArray(base)
+        ? base
+        : (Array.isArray(base?.pontos)
+            ? base.pontos
+            : (Array.isArray(base?.paradas) ? base.paradas : []));
+
+    if (!Array.isArray(lista) || lista.length === 0) {
+        return [];
+    }
+
+    return normalizarRegistrosParaFormulario(lista);
+}
+
+function carregarJson(textoJson) {
+    const registros = parseJson(textoJson);
+    if (registros.length < 2) {
+        alert('O JSON precisa ter ao menos 2 pontos válidos (origem e destino).');
+        return;
+    }
+
+    preencherFormularioComRegistros(registros);
+    salvarJsonCompartilhadoRotas(registros);
 }
 
 function adicionarParada() {
@@ -634,17 +792,39 @@ function mostrarRotaParcial(index) {
 window.addEventListener('DOMContentLoaded', initMap);
 window.addEventListener('DOMContentLoaded', () => {
     const csvInput = document.getElementById('csvInput');
-    if (!csvInput) return;
+    if (csvInput) {
+        csvInput.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
 
-    csvInput.addEventListener('change', (event) => {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                carregarCsv(String(reader.result || ''));
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        });
+    }
 
-        const reader = new FileReader();
-        reader.onload = () => {
-            carregarCsv(String(reader.result || ''));
-        };
-        reader.readAsText(file);
-        event.target.value = '';
-    });
+    const jsonInput = document.getElementById('jsonInput');
+    if (jsonInput) {
+        jsonInput.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    carregarJson(String(reader.result || ''));
+                } catch (error) {
+                    const mensagem = error instanceof Error ? error.message : 'Falha ao carregar JSON.';
+                    alert(mensagem);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        });
+    }
+
+    carregarJsonCompartilhadoNoFormulario();
 });

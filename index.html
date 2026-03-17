@@ -9,6 +9,12 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="system-switcher">
+        <button id="btnSistemaRotas" class="system-tab active" type="button">Sistema de Rotas</button>
+        <button id="btnSistemaPontos" class="system-tab" type="button">Gerenciador de Pontos</button>
+    </div>
+
+    <section id="sistemaRotas" class="system-panel active">
     <div class="container">
         <div class="sidebar">
             <h2>Localidades Pré-definidas</h2>
@@ -32,10 +38,16 @@
                 <div style="font-size: 12px; color: #666; margin-bottom: 6px;">
                     Formato: nome,latitude,longitude
                 </div>
-                <button class="btn-secondary btn-compact" onclick="document.getElementById('csvInput').click()">
-                    Carregar CSV
-                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-secondary btn-compact" onclick="document.getElementById('csvInput').click()">
+                        Carregar CSV
+                    </button>
+                    <button class="btn-secondary btn-compact" onclick="document.getElementById('jsonInput').click()">
+                        Carregar JSON
+                    </button>
+                </div>
                 <input type="file" id="csvInput" accept=".csv" style="display: none;">
+                <input type="file" id="jsonInput" accept=".json,application/json" style="display: none;">
             </div>
 
             <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 10px 0;">
@@ -137,6 +149,11 @@
 
         </div>
     </div>
+    </section>
+
+    <section id="sistemaPontos" class="system-panel">
+        <iframe id="pontosFrame" src="pontos.html" title="Gerenciador de Pontos"></iframe>
+    </section>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -149,5 +166,31 @@
 
     <!-- Script local -->
     <script src="script.js"></script>
+    <script>
+        function alternarSistema(sistema) {
+            const painelRotas = document.getElementById('sistemaRotas');
+            const painelPontos = document.getElementById('sistemaPontos');
+            const btnRotas = document.getElementById('btnSistemaRotas');
+            const btnPontos = document.getElementById('btnSistemaPontos');
+
+            const mostrarRotas = sistema === 'rotas';
+
+            painelRotas.classList.toggle('active', mostrarRotas);
+            painelPontos.classList.toggle('active', !mostrarRotas);
+            btnRotas.classList.toggle('active', mostrarRotas);
+            btnPontos.classList.toggle('active', !mostrarRotas);
+
+            if (mostrarRotas && typeof map !== 'undefined' && map) {
+                setTimeout(() => map.invalidateSize(), 80);
+            }
+        }
+
+        document.getElementById('btnSistemaRotas').addEventListener('click', () => alternarSistema('rotas'));
+        document.getElementById('btnSistemaPontos').addEventListener('click', () => alternarSistema('pontos'));
+
+        const parametros = new URLSearchParams(window.location.search);
+        const sistemaInicial = parametros.get('sistema') === 'pontos' ? 'pontos' : 'rotas';
+        alternarSistema(sistemaInicial);
+    </script>
 </body>
 </html>
