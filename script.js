@@ -25,8 +25,6 @@ function initMap() {
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-        minZoom: 10
     }).addTo(map);
 
     document.getElementById('origem').value = '';
