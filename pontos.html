@@ -49,8 +49,12 @@
       <p>Algoritmo</p>
       <select id="otimizadorSelect" aria-label="Otimizador">
         <option value="ag">AG</option>
+        <option value="cbc">CBC</option>
+        <option value="highs">HiGHS</option>
+        <option value="scip">SCIP</option>
       </select>
 
+      <div id="agParametros" class="parametros-ag">
       <label class="parametro-item" for="agGeracoes">
         <span>Gerações</span>
         <input id="agGeracoes" type="number" min="1" step="1" value="500" placeholder="Gerações" />
@@ -63,12 +67,18 @@
         <span>Elitismo</span>
         <input id="agElitismo" type="number" min="0" max="1" step="0.01" value="0.01" placeholder="Elitismo" />
       </label>
+      </div>
 
-      <button onclick="executarOtimizador()">Executar Otimizador</button>
+      <button id="executarOtimizadorBtn" onclick="executarOtimizador()">Executar Otimizador</button>
       <div class="acoes-exportacao">
         <button class="secondary" onclick="salvarMelhorRotaCSV()">Salvar CSV</button>
         <button class="secondary" onclick="salvarMelhorRotaJSON()">Salvar JSON</button>
       </div>
+    </div>
+
+    <div id="otimizadorLoading" class="otimizador-loading" aria-live="polite">
+      <div class="otimizador-spinner"></div>
+      <span>Aguardando resposta da API...</span>
     </div>
 
     <pre id="otimizadorOutput"></pre>

@@ -185,7 +185,31 @@ Depois acesse:
 
 - `http://localhost:8000/pontos.html`
 
-## 2) Node.js (modo CLI do AG)
+## 2) API Node + Julia
+
+O projeto agora inclui um servidor Node que expõe uma API para resolver a rota com os solvers do Julia.
+
+Inicie com:
+
+```bash
+node server.js
+```
+
+Depois abra:
+
+- `http://localhost:3000/pontos.html`
+
+Na tela de pontos você pode escolher:
+
+- `AG` para executar o algoritmo genético localmente
+- `CBC`, `HiGHS` ou `SCIP` para resolver via API Node + `main.jl`
+
+A resposta da API já retorna os textos de exportação:
+
+- CSV da solução
+- JSON da solução reordenada
+
+## 3) Node.js (modo CLI do AG)
 
 `ag.js` também roda em modo CLI:
 

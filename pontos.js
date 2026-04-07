@@ -2,6 +2,37 @@ let pontos = [];
 let marcadores = [];
 let matrizCustos = [];
 let melhorRotaEncontrada = null;
+let ultimoResultadoOtimizador = null;
+
+function resolverApiBase() {
+	const params = new URLSearchParams(window.location.search);
+	const baseViaQuery = params.get("apiBase");
+	if (baseViaQuery) {
+		localStorage.setItem("rotas_api_base", baseViaQuery);
+		return baseViaQuery;
+	}
+
+	const baseViaGlobal = typeof window.__ROTAS_API_BASE__ === "string" ? window.__ROTAS_API_BASE__ : "";
+	if (baseViaGlobal.trim()) {
+		return baseViaGlobal.trim();
+	}
+
+	const baseViaStorage = localStorage.getItem("rotas_api_base");
+	if (baseViaStorage && baseViaStorage.trim()) {
+		return baseViaStorage.trim();
+	}
+
+	if (window.location.protocol !== "file:") {
+		return window.location.origin;
+	}
+
+	const host = window.location.hostname || "localhost";
+	return `http://${host}:3020`;
+}
+
+const API_BASE = resolverApiBase().replace(/\/$/, "");
+const API_SOLUCAO_URL = `${API_BASE}/api/solve`;
+const API_SOLUCAO_URL_FALLBACK = Array.from({ length: 21 }, (_, idx) => `http://localhost:${3000 + idx}/api/solve`);
 
 const listaPontosEl = document.getElementById("listaPontos");
 const saidaEl = document.getElementById("matrizOutput");
@@ -12,12 +43,40 @@ const otimizadorSelectEl = document.getElementById("otimizadorSelect");
 const agGeracoesEl = document.getElementById("agGeracoes");
 const agPopulacaoEl = document.getElementById("agPopulacao");
 const agElitismoEl = document.getElementById("agElitismo");
+const executarOtimizadorBtnEl = document.getElementById("executarOtimizadorBtn");
+const otimizadorLoadingEl = document.getElementById("otimizadorLoading");
 const otimizadorOutputEl = document.getElementById("otimizadorOutput");
 
 const mapa = L.map("map").setView([-25.0, -53.0], 6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 	attribution: "© OpenStreetMap"
 }).addTo(mapa);
+
+if (otimizadorSelectEl) {
+	otimizadorSelectEl.addEventListener("change", atualizarVisibilidadeParametrosOtimizador);
+}
+
+atualizarVisibilidadeParametrosOtimizador();
+
+function atualizarVisibilidadeParametrosOtimizador() {
+	const painelParametros = document.getElementById("agParametros");
+	if (!painelParametros) {
+		return;
+	}
+
+	painelParametros.style.display = (otimizadorSelectEl?.value || "ag") === "ag" ? "flex" : "none";
+}
+
+function atualizarEstadoExecucaoOtimizador(ativo) {
+	if (otimizadorLoadingEl) {
+		otimizadorLoadingEl.classList.toggle("active", ativo);
+	}
+
+	if (executarOtimizadorBtnEl) {
+		executarOtimizadorBtnEl.disabled = ativo;
+		executarOtimizadorBtnEl.textContent = ativo ? "Executando..." : "Executar Otimizador";
+	}
+}
 
 function paraNumero(valor) {
 	if (typeof valor === "number") {
@@ -138,6 +197,27 @@ function montarResumoResultadoAG(melhor, solucaoInicial, distanciaInicial) {
 	].join("\n");
 }
 
+function montarResumoResultadoAPI(algoritmo, distanciaInicial, distanciaFinal, solucaoInicial, solucaoFinal) {
+	const ganhoMetros = distanciaInicial - distanciaFinal;
+	const ganhoPercentual = distanciaInicial > 0
+		? (ganhoMetros / distanciaInicial) * 100
+		: 0;
+
+	return [
+		`Resultados do Otimizador (${algoritmo})`,
+		"",
+		`Distância inicial: ${distanciaInicial.toFixed(3)} m`,
+		`Distância final:   ${distanciaFinal.toFixed(3)} m`,
+		`Melhoria:          ${ganhoMetros.toFixed(3)} m (${ganhoPercentual.toFixed(2)}%)`,
+		"",
+		"Rota inicial:",
+		formatarRotaComNomes(solucaoInicial),
+		"",
+		"Rota otimizada:",
+		formatarRotaComNomes(solucaoFinal)
+	].join("\n");
+}
+
 function escaparCampoCSV(valor) {
 	const texto = String(valor ?? "");
 	if (texto.includes(",") || texto.includes("\"") || texto.includes("\n")) {
@@ -165,13 +245,21 @@ function montarCSVMelhorRota(solucao) {
 	return linhas.join("\n");
 }
 
+function montarCSVDaRespostaAPI(csvText, solucao) {
+	if (typeof csvText === "string" && csvText.trim()) {
+		return csvText;
+	}
+
+	return montarCSVMelhorRota(solucao);
+}
+
 function salvarMelhorRotaCSV() {
 	if (!Array.isArray(melhorRotaEncontrada) || melhorRotaEncontrada.length === 0) {
 		alert("Execute o otimizador primeiro para gerar a melhor rota.");
 		return;
 	}
 
-	const conteudo = montarCSVMelhorRota(melhorRotaEncontrada);
+	const conteudo = montarCSVDaRespostaAPI(ultimoResultadoOtimizador?.csvText, melhorRotaEncontrada);
 	const blob = new Blob([conteudo], { type: "text/csv;charset=utf-8;" });
 	const url = URL.createObjectURL(blob);
 
@@ -223,7 +311,9 @@ function salvarMelhorRotaJSON() {
 		return;
 	}
 
-	const dados = montarDadosJSONMelhorRota(melhorRotaEncontrada);
+	const dados = typeof ultimoResultadoOtimizador?.jsonText === "string" && ultimoResultadoOtimizador.jsonText.trim()
+		? JSON.parse(ultimoResultadoOtimizador.jsonText)
+		: montarDadosJSONMelhorRota(melhorRotaEncontrada);
 	const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
 	const url = URL.createObjectURL(blob);
 
@@ -235,41 +325,139 @@ function salvarMelhorRotaJSON() {
 	URL.revokeObjectURL(url);
 }
 
-function executarOtimizador() {
+
+function converterRotaParaBaseZero(rota) {
+	if (!Array.isArray(rota)) {
+		return [];
+	}
+
+	return rota
+		.map((indice) => Number(indice))
+		.filter((indice) => Number.isFinite(indice))
+		.map((indice) => (indice > 0 ? indice - 1 : indice));
+}
+
+async function executarOtimizador() {
+	if (otimizadorOutputEl) {
+		otimizadorOutputEl.textContent = "";
+	}
+
+	melhorRotaEncontrada = null;
+	ultimoResultadoOtimizador = null;
+
 	if (!matrizValida()) {
 		alert("Gere uma matriz de custos válida antes de executar o otimizador.");
 		return;
 	}
 
 	const otimizador = otimizadorSelectEl?.value || "ag";
-	if (otimizador !== "ag") {
-		alert("Otimizador não suportado no momento.");
-		return;
-	}
-
-	if (typeof window.algoritmo_genetico !== "function") {
-		alert("Função do AG não encontrada. Verifique o carregamento do ag.js.");
-		return;
-	}
-
+	const executandoViaApi = otimizador !== "ag";
 	const { numGeracoes, tamanhoPopulacao, taxaElitismo } = obterParametrosAG();
 	const solucaoInicial = gerarSolucaoInicialPadrao(pontos.length);
 	const distanciaInicial = calcularDistanciaSolucao(solucaoInicial);
-	const arquivo = {
-		pontos,
-		matriz: matrizCustos
-	};
 
-	const melhor = window.algoritmo_genetico(arquivo, numGeracoes, tamanhoPopulacao, taxaElitismo);
-	if (!melhor || !Array.isArray(melhor.solucao)) {
-		alert("Falha ao executar o otimizador AG.");
-		return;
-	}
+	atualizarEstadoExecucaoOtimizador(executandoViaApi);
 
-	melhorRotaEncontrada = [...melhor.solucao];
+	try {
+		if (otimizador === "ag") {
+			if (typeof window.algoritmo_genetico !== "function") {
+				alert("Função do AG não encontrada. Verifique o carregamento do ag.js.");
+				return;
+			}
 
-	if (otimizadorOutputEl) {
-		otimizadorOutputEl.textContent = montarResumoResultadoAG(melhor, solucaoInicial, distanciaInicial);
+			const arquivo = {
+				pontos,
+				matriz: matrizCustos
+			};
+
+			const melhor = window.algoritmo_genetico(arquivo, numGeracoes, tamanhoPopulacao, taxaElitismo);
+			if (!melhor || !Array.isArray(melhor.solucao)) {
+				alert("Falha ao executar o otimizador AG.");
+				return;
+			}
+
+			melhorRotaEncontrada = [...melhor.solucao];
+			ultimoResultadoOtimizador = {
+				algoritmo: "AG",
+				solucao: [...melhor.solucao],
+				csvText: montarCSVMelhorRota(melhor.solucao),
+				jsonText: JSON.stringify(montarDadosJSONMelhorRota(melhor.solucao), null, 2),
+				custoTotal: Number(melhor.fit_distancia)
+			};
+
+			if (otimizadorOutputEl) {
+				otimizadorOutputEl.textContent = montarResumoResultadoAG(melhor, solucaoInicial, distanciaInicial);
+			}
+
+			return;
+		}
+
+		const payload = JSON.stringify({
+			pontos,
+			matriz_custos: matrizCustos,
+			algoritmo: otimizador
+		});
+
+		const urls = window.location.protocol === "file:" ? API_SOLUCAO_URL_FALLBACK : [API_SOLUCAO_URL];
+		let dados = null;
+		let erroFinal = null;
+
+		for (const url of urls) {
+			try {
+				const resposta = await fetch(url, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: payload
+				});
+
+				dados = await resposta.json();
+				if (!resposta.ok) {
+					throw new Error(dados?.error || "Falha ao resolver a rota via API.");
+				}
+
+				erroFinal = null;
+				break;
+			} catch (error) {
+				erroFinal = error;
+			}
+		}
+
+		if (!dados) {
+			throw erroFinal || new Error("A API não respondeu. Verifique se o servidor está rodando.");
+		}
+
+		const rotaNormalizada = converterRotaParaBaseZero(dados.rota);
+		if (rotaNormalizada.length === 0) {
+			throw new Error("A API não retornou uma rota válida.");
+		}
+
+		melhorRotaEncontrada = [...rotaNormalizada];
+		ultimoResultadoOtimizador = {
+			algoritmo: String(dados.algoritmo || otimizador).toUpperCase(),
+			solucao: rotaNormalizada,
+			csvText: dados.csvText,
+			jsonText: dados.jsonText,
+			custoTotal: Number(dados.custo_total ?? 0)
+		};
+
+		if (otimizadorOutputEl) {
+			otimizadorOutputEl.textContent = montarResumoResultadoAPI(
+				String(dados.algoritmo || otimizador).toUpperCase(),
+				distanciaInicial,
+				Number(dados.custo_total ?? 0),
+				solucaoInicial,
+				rotaNormalizada
+			);
+		}
+	} catch (error) {
+		if (otimizadorOutputEl) {
+			otimizadorOutputEl.textContent = `Erro: ${error.message || "Falha ao executar o otimizador."}`;
+		}
+		alert(error.message || "Erro ao executar o otimizador.");
+	} finally {
+		atualizarEstadoExecucaoOtimizador(false);
 	}
 }
 
