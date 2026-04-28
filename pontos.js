@@ -27,12 +27,11 @@ function resolverApiBase() {
 	}
 
 	const host = window.location.hostname || "localhost";
-	return `http://${host}:3020`;
+	return `http://${host}:3000`;
 }
 
 const API_BASE = resolverApiBase().replace(/\/$/, "");
 const API_SOLUCAO_URL = `${API_BASE}/api/solve`;
-const API_SOLUCAO_URL_FALLBACK = Array.from({ length: 21 }, (_, idx) => `http://localhost:${3000 + idx}/api/solve`);
 
 const listaPontosEl = document.getElementById("listaPontos");
 const saidaEl = document.getElementById("matrizOutput");
@@ -398,7 +397,7 @@ async function executarOtimizador() {
 			algoritmo: otimizador
 		});
 
-		const urls = window.location.protocol === "file:" ? API_SOLUCAO_URL_FALLBACK : [API_SOLUCAO_URL];
+		const urls = [API_SOLUCAO_URL];
 		let dados = null;
 		let erroFinal = null;
 

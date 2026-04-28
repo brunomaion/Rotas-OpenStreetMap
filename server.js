@@ -4,8 +4,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const PORT = 3020;
-const MAX_PORT_ATTEMPTS = 20;
+const PORT = 3000;
 const ROOT_DIR = __dirname;
 const MAIN_JL = path.join(ROOT_DIR, 'main.jl');
 
@@ -308,34 +307,20 @@ const server = http.createServer((req, res) => {
   servirArquivoEstático(req, res, url.pathname);
 });
 
-let portaAtual = PORT;
-let tentativas = 0;
-
 server.on('listening', () => {
   const endereco = server.address();
-  const porta = typeof endereco === 'object' && endereco ? endereco.port : portaAtual;
+  const porta = typeof endereco === 'object' && endereco ? endereco.port : PORT;
   console.log(`Servidor rodando em http://localhost:${porta}`);
 });
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    tentativas += 1;
-    if (tentativas >= MAX_PORT_ATTEMPTS) {
-      console.error(`Não foi possível iniciar o servidor após ${tentativas} tentativas de porta.`);
-      process.exit(1);
-    }
-
-    const proximaPorta = portaAtual + 1;
-    console.log(`Porta ${portaAtual} em uso. Tentando a porta ${proximaPorta}...`);
-    portaAtual = proximaPorta;
-    setTimeout(() => {
-      server.listen(portaAtual);
-    }, 50);
-    return;
+    console.error(`Porta ${PORT} em uso. Encerre o processo atual da porta ${PORT} e tente novamente.`);
+    process.exit(1);
   }
 
   console.error(error);
   process.exit(1);
 });
 
-server.listen(portaAtual);
+server.listen(PORT);
