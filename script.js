@@ -23,8 +23,9 @@ function initMap() {
     
     map = L.map('map').setView(cascavelCenter, 13);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
+        referrerPolicy: 'origin'
     }).addTo(map);
 
     document.getElementById('origem').value = '';

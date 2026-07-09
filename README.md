@@ -171,7 +171,13 @@ Componentes principais:
 
 ## 1) Navegador (principal)
 
-Como é um projeto estático, abra `pontos.html` no navegador.
+Como o mapa usa tiles públicos do OpenStreetMap, execute o servidor local antes de abrir a interface:
+
+```bash
+node server.js
+```
+
+Depois acesse `http://localhost:3000/pontos.html`.
 
 Recomendação: usar servidor local para evitar limitações de CORS/arquivos em alguns navegadores.
 

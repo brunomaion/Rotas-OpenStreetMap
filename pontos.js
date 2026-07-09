@@ -47,7 +47,7 @@ const otimizadorLoadingEl = document.getElementById("otimizadorLoading");
 const otimizadorOutputEl = document.getElementById("otimizadorOutput");
 
 const mapa = L.map("map").setView([-25.0, -53.0], 6);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 	attribution: "© OpenStreetMap"
 }).addTo(mapa);
 
